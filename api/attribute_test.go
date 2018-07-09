@@ -1104,7 +1104,7 @@ func Test_ExtendedCommunitiesAttribute(t *testing.T) {
 	assert.Nil(err)
 	communities = append(communities, a)
 	a, err = ptypes.MarshalAny(&DefaultGatewayExtended{
-		// No value
+	// No value
 	})
 	assert.Nil(err)
 	communities = append(communities, a)

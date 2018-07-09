@@ -1152,9 +1152,9 @@ func modNeighbor(cmdType string, args []string) error {
 			if err != nil {
 				return err
 			}
-			peer.EbgpMultihop = config.EbgpMultihop {
-				Config: config.EbgpMultihopConfig {
-					Enabled: true,
+			peer.EbgpMultihop = config.EbgpMultihop{
+				Config: config.EbgpMultihopConfig{
+					Enabled:     true,
 					MultihopTtl: uint8(ttl),
 				},
 			}
