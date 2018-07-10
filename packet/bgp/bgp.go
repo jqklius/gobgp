@@ -8466,7 +8466,7 @@ func ParsePmsiTunnel(args []string) (*PathAttributePmsiTunnel, error) {
 		return nil, fmt.Errorf("invalid pmsi tunnel arguments: %s", args)
 	}
 
-	pmsi := NewPathAttributePmsiTunnel(0, false, 0, nil)
+	pmsi := NewPathAttributePmsiTunnel(0, false, 0, &DefaultPmsiTunnelID{})
 
 	switch args[0] {
 	case "ingress-repl":
