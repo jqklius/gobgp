@@ -400,6 +400,7 @@ func MarshalNLRI(value bgp.AddrPrefixInterface) *any.Any {
 				IpPrefix:    r.IPPrefix.String(),
 				IpPrefixLen: uint32(r.IPPrefixLength),
 				Label:       r.Label,
+				GwAddress:   r.GWIPAddress.String(),
 			}
 		}
 	case *bgp.LabeledVPNIPAddrPrefix:
