@@ -427,7 +427,8 @@ var MatchSetOptionsRestrictedTypeToIntMap = map[MatchSetOptionsRestrictedType]in
 }
 
 func (v MatchSetOptionsRestrictedType) ToInt() int {
-	i, ok := MatchSetOptionsRestrictedTypeToIntMap[v]
+	_v := v.DefaultAsNeeded()
+	i, ok := MatchSetOptionsRestrictedTypeToIntMap[_v]
 	if !ok {
 		return -1
 	}
@@ -476,7 +477,8 @@ var MatchSetOptionsTypeToIntMap = map[MatchSetOptionsType]int{
 }
 
 func (v MatchSetOptionsType) ToInt() int {
-	i, ok := MatchSetOptionsTypeToIntMap[v]
+	_v := v.DefaultAsNeeded()
+	i, ok := MatchSetOptionsTypeToIntMap[_v]
 	if !ok {
 		return -1
 	}
