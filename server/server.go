@@ -991,7 +991,7 @@ func (server *BgpServer) propagateUpdateToNeighbors(source *Peer, newPath *table
 	}
 	family := newPath.GetRouteFamily()
 	for _, targetPeer := range server.neighborMap {
-		if (source == nil && targetPeer.isRouteServerClient()) || (source != nil && source.isRouteServerClient() != targetPeer.isRouteServerClient()) {
+		if source != nil && source.isRouteServerClient() != targetPeer.isRouteServerClient() {
 			continue
 		}
 		f := func() bgp.RouteFamily {
