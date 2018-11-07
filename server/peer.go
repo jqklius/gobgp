@@ -134,7 +134,7 @@ func (peer *Peer) TableID() string {
 }
 
 func (peer *Peer) isIBGPPeer() bool {
-	return peer.fsm.pConf.State.PeerAs == peer.fsm.gConf.Config.As
+	return peer.fsm.pConf.State.PeerType == config.PEER_TYPE_INTERNAL
 }
 
 func (peer *Peer) isRouteServerClient() bool {
