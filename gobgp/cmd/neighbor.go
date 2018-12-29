@@ -705,13 +705,187 @@ func parseCIDRorIP(str string) (net.IP, *net.IPNet, error) {
 	return ip, nil, nil
 }
 
+func isParamMath(in_key, in_val string, params map[string][]string, param_type int) bool {
+	for pk, pv := range params {
+		if pk == "" {
+			continue
+		}
+		if in_key != pk {
+			continue
+		}
+		if len(pv) == 0 {
+			continue
+		}
+
+		switch param_type {
+		case PARAM_SINGLE:
+			if len(pv) != 1 {
+				fmt.Errorf("%s should have one argument", pk)
+				return false
+			}
+			if pv[0] != in_val {
+				return false
+			}
+		case PARAM_LIST:
+			is_match := false
+			for _, _v := range pv {
+				if _v != in_val {
+					continue
+				} else {
+					is_match = true
+					break
+				}
+			}
+			if is_match == false {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func getRibShowFilter(args []string) (map[string][]string, error) {
+	fmt.Printf("args:%s", args)
+	m, err := extractReserved(args, map[string]int{
+		"mac":        PARAM_LIST,
+		"ip":         PARAM_LIST,
+		"as-path":    PARAM_SINGLE,
+		"rd":         PARAM_SINGLE,
+		"rt":         PARAM_LIST,
+		"nexthop":    PARAM_SINGLE,
+		"router-mac": PARAM_SINGLE})
+	if err != nil {
+		return m, err
+	}
+	// has unsupported args
+	if len(m[""]) != 0 {
+		invalid_args := m[""][0]
+		valid_args := "<mac> <ip> <as-path> <rd> <rt> <nexthop> <router-mac>"
+		return m, fmt.Errorf("invalid filtering args [%s], valid filtering args is %s",
+			invalid_args, valid_args)
+	}
+	return m, err
+}
+
+func getRibByFilter(m map[string][]string, dsts []*api.Destination) []*api.Destination {
+	var filter_dsts []*api.Destination
+	for _, d := range dsts {
+		l := make([]*api.Path, 0, len(d.Paths))
+		// filter by path
+		for _, p := range d.GetPaths() {
+			attrs, _ := p.GetNativePathAttributes()
+
+			// Next Hop
+			nexthop := "fictitious"
+			if n := getNextHopFromPathAttributes(attrs); n != nil {
+				nexthop = n.String()
+			}
+
+			// AS_PATH
+			var aspathstr string
+			for _, attr := range attrs {
+				switch a := attr.(type) {
+				case *bgp.PathAttributeAsPath:
+					aspathstr = bgp.AsPathString(a)
+				}
+			}
+
+			var rd string
+			var guest_mac net.HardwareAddr
+			var guest_ip net.IP
+
+			nlri, _ := p.GetNativeNlri()
+			route_type := nlri.(*bgp.EVPNNLRI).RouteType
+			switch route_type {
+			case bgp.EVPN_ROUTE_TYPE_MAC_IP_ADVERTISEMENT:
+				e := nlri.(*bgp.EVPNNLRI).RouteTypeData.(*bgp.EVPNMacIPAdvertisementRoute)
+				rd = e.RD.String()
+				guest_mac = e.MacAddress
+				guest_ip = e.IPAddress
+			case bgp.EVPN_INCLUSIVE_MULTICAST_ETHERNET_TAG:
+				e := nlri.(*bgp.EVPNNLRI).RouteTypeData.(*bgp.EVPNMulticastEthernetTagRoute)
+				rd = e.RD.String()
+				guest_ip = e.IPAddress
+			}
+
+			// get router_mac and rt
+			var router_mac net.HardwareAddr
+			var rt string
+
+			eCommunityList := make([]bgp.ExtendedCommunityInterface, 0)
+			for _, a := range attrs {
+				switch a.GetType() {
+				case bgp.BGP_ATTR_TYPE_EXTENDED_COMMUNITIES:
+					if attr := a; attr != nil {
+						eCommunities := attr.(*bgp.PathAttributeExtendedCommunities).Value
+						eCommunityList = append(eCommunityList, eCommunities...)
+						break
+					}
+				}
+			}
+
+			for _, ec := range eCommunityList {
+				_, st := ec.GetTypes()
+
+				switch st {
+				case bgp.EC_SUBTYPE_MAC_MOBILITY:
+					break
+				case bgp.EC_SUBTYPE_ROUTER_MAC:
+					router_mac = ec.(*bgp.RouterMacExtended).Mac
+					break
+				case bgp.EC_SUBTYPE_ROUTE_TARGET:
+					rt = ec.String()
+					break
+				default:
+					break
+				}
+			}
+
+			if isParamMath("nexthop", nexthop, m, PARAM_SINGLE) == false {
+				continue
+			}
+
+			if isParamMath("as-path", aspathstr, m, PARAM_SINGLE) == false {
+				continue
+			}
+
+			if isParamMath("mac", guest_mac.String(), m, PARAM_LIST) == false {
+				continue
+			}
+
+			if isParamMath("ip", guest_ip.String(), m, PARAM_LIST) == false {
+				continue
+			}
+
+			if isParamMath("rd", rd, m, PARAM_SINGLE) == false {
+				continue
+			}
+
+			if isParamMath("rt", rt, m, PARAM_LIST) == false {
+				continue
+			}
+
+			if isParamMath("router-mac", router_mac.String(), m, PARAM_SINGLE) == false {
+				continue
+			}
+			// update
+			l = append(l, p)
+		}
+		// update
+		d.Paths = l
+		filter_dsts = append(filter_dsts, d)
+	}
+	return filter_dsts
+}
+
 func showNeighborRib(r string, name string, args []string) error {
 	showBest := false
 	showAge := true
 	showLabel := false
 	showIdentifier := bgp.BGP_ADD_PATH_NONE
-	validationTarget := ""
+	m := make(map[string][]string)
 
+	validationTarget := ""
 	def := addr2AddressFamily(net.ParseIP(name))
 	switch r {
 	case CMD_GLOBAL:
@@ -747,6 +921,13 @@ func showNeighborRib(r string, name string, args []string) error {
 		}
 		var option api.TableLookupOption
 		args = args[1:]
+
+		// get by filter
+		m, err = getRibShowFilter(args)
+		if err != nil {
+			return fmt.Errorf("show rib by filter failed: %v", err.Error())
+		}
+
 		for len(args) != 0 {
 			if args[0] == "longer-prefixes" {
 				option = api.TableLookupOption_LOOKUP_LONGER
@@ -757,11 +938,14 @@ func showNeighborRib(r string, name string, args []string) error {
 					return fmt.Errorf("RPKI information is supported for only adj-in.")
 				}
 				validationTarget = target
-			} else {
-				return fmt.Errorf("invalid format for route filtering")
 			}
 			args = args[1:]
 		}
+		/*
+			if option == -1 {
+				return fmt.Errorf("invalid format for route filtering")
+			}
+		*/
 		filter = []*api.TableLookupPrefix{&api.TableLookupPrefix{
 			Prefix:       target,
 			LookupOption: option,
@@ -834,7 +1018,11 @@ func showNeighborRib(r string, name string, args []string) error {
 		}
 	} else {
 		// show RIB
+
 		dsts := rib.GetDestinations()
+		dsts = getRibByFilter(m, dsts)
+
+		// dsts := rib.GetDestinations()
 		switch family {
 		case bgp.RF_IPv4_UC, bgp.RF_IPv6_UC:
 			type d struct {
