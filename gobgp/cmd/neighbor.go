@@ -208,7 +208,7 @@ func showNeighbor(args []string) error {
 	fmt.Printf("  Hold time is %d, keepalive interval is %d seconds\n", int(p.Timers.State.NegotiatedHoldTime), int(p.Timers.State.KeepaliveInterval))
 	fmt.Printf("  Configured hold time is %d, keepalive interval is %d seconds\n", int(p.Timers.Config.HoldTime), int(p.Timers.Config.KeepaliveInterval))
 
-	elems := make([]string, 0, 3)
+	elems := make([]string, 0, 4)
 	if as := p.AsPathOptions.Config.AllowOwnAs; as > 0 {
 		elems = append(elems, fmt.Sprintf("Allow Own AS: %d", as))
 	}
@@ -221,8 +221,12 @@ func showNeighbor(args []string) error {
 	if p.AsPathOptions.Config.ReplacePeerAs {
 		elems = append(elems, "Replace peer AS: enabled")
 	}
+	if remotePort := p.Transport.Config.RemotePort; remotePort > 0 {
+		elems = append(elems, fmt.Sprintf("Remote-port: %d", remotePort))
+	}
 
 	fmt.Printf("  %s\n", strings.Join(elems, ", "))
+	fmt.Printf("\n")
 
 	fmt.Printf("  Neighbor capabilities:\n")
 	caps := capabilities{}
@@ -1045,7 +1049,8 @@ func modNeighbor(cmdType string, args []string) error {
 		params["remove-private-as"] = PARAM_SINGLE
 		params["replace-peer-as"] = PARAM_FLAG
 		params["ebgp-multihop-ttl"] = PARAM_SINGLE
-		usage += " [ family <address-families-list> | vrf <vrf-name> | route-reflector-client [<cluster-id>] | route-server-client | allow-own-as <num> | remove-private-as (all|replace) | replace-peer-as | ebgp-multihop-ttl <ttl>]"
+		params["remote-port"] = PARAM_SINGLE
+		usage += " [ family <address-families-list> | vrf <vrf-name> | route-reflector-client [<cluster-id>] | route-server-client | allow-own-as <num> | remove-private-as (all|replace) | replace-peer-as | ebgp-multihop-ttl <ttl> | remote-port <port>]"
 	}
 
 	m, err := extractReserved(args, params)
@@ -1158,6 +1163,13 @@ func modNeighbor(cmdType string, args []string) error {
 					MultihopTtl: uint8(ttl),
 				},
 			}
+		}
+		if option, ok := m["remote-port"]; ok {
+			remotePort, err := strconv.ParseUint(option[0], 10, 16)
+			if err != nil {
+				return err
+			}
+			peer.Transport.Config.RemotePort = uint16(remotePort)
 		}
 		return nil
 	}
