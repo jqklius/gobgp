@@ -41,7 +41,7 @@ import (
 	"github.com/osrg/gobgp/table"
 )
 
-var version = "master"
+var version = "1.33.9"
 
 func marshalRouteTargets(l []string) ([]*any.Any, error) {
 	rtList := make([]*any.Any, 0, len(l))
