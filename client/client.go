@@ -243,12 +243,14 @@ func (cli *Client) SoftReset(addr string, family bgp.RouteFamily) error {
 	return cli.softreset(addr, family, api.SoftResetNeighborRequest_BOTH)
 }
 
-func (cli *Client) getRIB(resource api.Resource, name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
+func (cli *Client) _getRIB(resource api.Resource, name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
+
 	stream, err := cli.cli.GetPath(context.Background(), &api.GetPathRequest{
-		Type:     resource,
-		Family:   uint32(family),
-		Name:     name,
-		Prefixes: prefixes,
+		Type:       resource,
+		Family:     uint32(family),
+		Name:       name,
+		Prefixes:   prefixes,
+		Pathfilter: pathfilter,
 	})
 	if err != nil {
 		return nil, err
@@ -283,8 +285,20 @@ func (cli *Client) getRIB(resource api.Resource, name string, family bgp.RouteFa
 	}, nil
 }
 
-func (cli *Client) GetRIB(family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
-	return cli.getRIB(api.Resource_GLOBAL, "", family, prefixes)
+func (cli *Client) getRIBByFilter(resource api.Resource, name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
+	return cli._getRIB(resource, name, family, prefixes, pathfilter)
+}
+
+func (cli *Client) getRIB(resource api.Resource, name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
+	return cli._getRIB(resource, name, family, prefixes, nil)
+}
+
+func (cli *Client) GetRIB(family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
+	if pathfilter != nil {
+		return cli.getRIBByFilter(api.Resource_GLOBAL, "", family, prefixes, pathfilter)
+	} else {
+		return cli.getRIB(api.Resource_GLOBAL, "", family, prefixes)
+	}
 }
 
 func (cli *Client) GetLocalRIB(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {

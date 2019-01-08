@@ -705,12 +705,67 @@ func parseCIDRorIP(str string) (net.IP, *net.IPNet, error) {
 	return ip, nil, nil
 }
 
+func getRibShowFilter(args []string) (*api.PathFilter, error) {
+	pathfilter := new(api.PathFilter)
+
+	fmt.Println("args:", args)
+	m, err := extractReserved(args, map[string]int{
+		"mac":        PARAM_LIST,
+		"ip":         PARAM_LIST,
+		"rt":         PARAM_LIST,
+		"rd":         PARAM_SINGLE,
+		"aspath":     PARAM_SINGLE,
+		"nexthop":    PARAM_SINGLE,
+		"router-mac": PARAM_SINGLE})
+	if err != nil {
+		return pathfilter, err
+	}
+	// has unsupported args
+	if len(m[""]) != 0 {
+		invalid_args := m[""][0]
+		valid_args := "<mac> <ip> <aspath> <rd> <rt> <nexthop> <router-mac>"
+		return pathfilter, fmt.Errorf("invalid filtering args [%s], valid filtering args is %s",
+			invalid_args, valid_args)
+	}
+
+	if len(m["mac"]) > 0 {
+		for _, mac := range m["mac"] {
+			pathfilter.Mac = append(pathfilter.Mac, mac)
+		}
+	}
+	if len(m["ip"]) > 0 {
+		for _, ip := range m["ip"] {
+			pathfilter.Ip = append(pathfilter.Ip, ip)
+		}
+	}
+	if len(m["rt"]) > 0 {
+		for _, rt := range m["rt"] {
+			pathfilter.Rt = append(pathfilter.Rt, rt)
+		}
+	}
+	if len(m["rd"]) > 0 {
+		pathfilter.Rd = m["rd"][0]
+	}
+	if len(m["aspath"]) > 0 {
+		pathfilter.AsPath = m["aspath"][0]
+	}
+	if len(m["nexthop"]) > 0 {
+		pathfilter.Nexthop = m["nexthop"][0]
+	}
+	if len(m["router-mac"]) > 0 {
+		pathfilter.RouterMac = m["router-mac"][0]
+	}
+	fmt.Println("pathfilter:", pathfilter)
+	return pathfilter, err
+}
+
 func showNeighborRib(r string, name string, args []string) error {
 	showBest := false
 	showAge := true
 	showLabel := false
 	showIdentifier := bgp.BGP_ADD_PATH_NONE
 	validationTarget := ""
+	var pathfilter *api.PathFilter
 
 	def := addr2AddressFamily(net.ParseIP(name))
 	switch r {
@@ -747,6 +802,13 @@ func showNeighborRib(r string, name string, args []string) error {
 		}
 		var option api.TableLookupOption
 		args = args[1:]
+		// get by filter
+
+		pathfilter, err = getRibShowFilter(args)
+		if err != nil {
+			return fmt.Errorf("show rib by filter failed: %v", err.Error())
+		}
+
 		for len(args) != 0 {
 			if args[0] == "longer-prefixes" {
 				option = api.TableLookupOption_LOOKUP_LONGER
@@ -757,22 +819,24 @@ func showNeighborRib(r string, name string, args []string) error {
 					return fmt.Errorf("RPKI information is supported for only adj-in.")
 				}
 				validationTarget = target
-			} else {
-				return fmt.Errorf("invalid format for route filtering")
 			}
 			args = args[1:]
 		}
+
 		filter = []*api.TableLookupPrefix{&api.TableLookupPrefix{
 			Prefix:       target,
 			LookupOption: option,
 		},
 		}
+
+		fmt.Println("filter Prefix:", target)
+		fmt.Println("filter:", filter)
 	}
 
 	var rib *api.Table
 	switch r {
 	case CMD_GLOBAL:
-		rib, err = client.GetRIB(family, filter)
+		rib, err = client.GetRIB(family, filter, pathfilter)
 	case CMD_LOCAL:
 		rib, err = client.GetLocalRIB(name, family, filter)
 	case CMD_ADJ_IN, CMD_ACCEPTED, CMD_REJECTED:
