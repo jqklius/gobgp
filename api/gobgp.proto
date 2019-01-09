@@ -687,11 +687,22 @@ message TableLookupPrefix {
   TableLookupOption lookup_option = 2;
 }
 
+message PathFilter {
+	repeated string mac = 1;
+	repeated string ip = 2;
+	repeated string rt = 3;
+	string rd = 4;
+	string as_path = 5;
+	string nexthop = 6;
+	string router_mac = 7;
+}
+
 message GetPathRequest {
   Resource type = 1;
   string name = 2;
   uint32 family = 3;
   repeated TableLookupPrefix prefixes = 4;
+  PathFilter pathfilter = 5;
 }
 
 message ValidateRibRequest {

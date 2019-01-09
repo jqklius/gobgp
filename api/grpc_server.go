@@ -569,6 +569,129 @@ func (s *Server) GetRib(ctx context.Context, arg *GetRibRequest) (*GetRibRespons
 	}, err
 }
 
+func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
+	if pathfilter == nil {
+		return true
+	}
+	var match bool
+	var rd string
+	var guest_mac net.HardwareAddr
+	var guest_ip net.IP
+	var path_router_mac net.HardwareAddr
+	var path_rt string
+	nexthop := path.GetNexthop()
+
+	route_type := path.GetNlri().(*bgp.EVPNNLRI).RouteType
+	switch route_type {
+	case bgp.EVPN_ROUTE_TYPE_MAC_IP_ADVERTISEMENT:
+		e := path.GetNlri().(*bgp.EVPNNLRI).RouteTypeData.(*bgp.EVPNMacIPAdvertisementRoute)
+		rd = e.RD.String()
+		guest_mac = e.MacAddress
+		guest_ip = e.IPAddress
+	case bgp.EVPN_INCLUSIVE_MULTICAST_ETHERNET_TAG:
+		e := path.GetNlri().(*bgp.EVPNNLRI).RouteTypeData.(*bgp.EVPNMulticastEthernetTagRoute)
+		rd = e.RD.String()
+		guest_ip = e.IPAddress
+	}
+
+	for _, ec := range path.GetExtCommunities() {
+		_, st := ec.GetTypes()
+
+		switch st {
+		case bgp.EC_SUBTYPE_ROUTER_MAC:
+			path_router_mac = ec.(*bgp.RouterMacExtended).Mac
+			break
+		case bgp.EC_SUBTYPE_ROUTE_TARGET:
+			path_rt = ec.String()
+			break
+		default:
+			break
+		}
+	}
+
+	if len(pathfilter.Mac) > 0 {
+		match = false
+		for _, mac := range pathfilter.Mac {
+			if mac == guest_mac.String() {
+				match = true
+				break
+			}
+		}
+		if match == false {
+			return false
+		}
+	}
+
+	if len(pathfilter.Ip) > 0 {
+		match = false
+		for _, ip := range pathfilter.Ip {
+			if ip == guest_ip.String() {
+				match = true
+				break
+			}
+		}
+		if match == false {
+			return false
+		}
+	}
+
+	if len(pathfilter.Rt) > 0 {
+		match = false
+		for _, rt := range pathfilter.Rt {
+			if path_rt == rt {
+				match = true
+				break
+			}
+		}
+		if match == false {
+			return false
+		}
+	}
+
+	if len(pathfilter.Rd) > 0 {
+		match = false
+		if pathfilter.Rd == rd {
+			match = true
+		}
+		if match == false {
+			return false
+		}
+	}
+
+	if len(pathfilter.AsPath) > 0 {
+		aspath := path.GetAsString()
+		match = false
+		if strings.TrimSpace(pathfilter.AsPath) == aspath {
+			match = true
+		}
+		if match == false {
+			return false
+		}
+	}
+
+	if len(pathfilter.Nexthop) > 0 {
+		match = false
+		if pathfilter.Nexthop == nexthop.String() {
+			match = true
+		}
+		if match == false {
+			return false
+		}
+	}
+
+	if len(pathfilter.RouterMac) > 0 {
+		match = false
+		if pathfilter.RouterMac == path_router_mac.String() {
+			match = true
+		}
+		if match == false {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (s *Server) GetPath(arg *GetPathRequest, stream GobgpApi_GetPathServer) error {
 	f := func() []*table.LookupPrefix {
 		l := make([]*table.LookupPrefix, 0, len(arg.Prefixes))
@@ -609,12 +732,17 @@ func (s *Server) GetPath(arg *GetPathRequest, stream GobgpApi_GetPathServer) err
 			for i, path := range dst.GetAllKnownPathList() {
 				p := ToPathApi(path, getValidation(v, idx))
 				idx++
+				// check path is match
+				if isPathFilterMath(path, arg.Pathfilter) == false {
+					continue
+				}
 				if i == 0 && !table.SelectionOptions.DisableBestPathSelection {
 					switch arg.Type {
 					case Resource_LOCAL, Resource_GLOBAL:
 						p.Best = true
 					}
 				}
+
 				if err := stream.Send(p); err != nil {
 					return err
 				}
