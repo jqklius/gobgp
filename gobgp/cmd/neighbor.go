@@ -708,7 +708,6 @@ func parseCIDRorIP(str string) (net.IP, *net.IPNet, error) {
 func getRibShowFilter(args []string) (*api.PathFilter, error) {
 	pathfilter := new(api.PathFilter)
 
-	fmt.Println("args:", args)
 	m, err := extractReserved(args, map[string]int{
 		"mac":        PARAM_LIST,
 		"ip":         PARAM_LIST,
@@ -721,12 +720,14 @@ func getRibShowFilter(args []string) (*api.PathFilter, error) {
 		return pathfilter, err
 	}
 	// has unsupported args
-	if len(m[""]) != 0 {
-		invalid_args := m[""][0]
-		valid_args := "<mac> <ip> <aspath> <rd> <rt> <nexthop> <router-mac>"
-		return pathfilter, fmt.Errorf("invalid filtering args [%s], valid filtering args is %s",
-			invalid_args, valid_args)
-	}
+	/*
+		if len(m[""]) != 0 {
+			invalid_args := m[""][0]
+			valid_args := "<mac>[,<mac>] <ip>[,<ip>] <rt>[,<rt>] <rd> <aspath> <nexthop> <router-mac>"
+			return pathfilter, fmt.Errorf("invalid filtering args [%s], valid filtering args is %s",
+				invalid_args, valid_args)
+		}
+	*/
 
 	if len(m["mac"]) > 0 {
 		for _, mac := range m["mac"] {
@@ -755,7 +756,7 @@ func getRibShowFilter(args []string) (*api.PathFilter, error) {
 	if len(m["router-mac"]) > 0 {
 		pathfilter.RouterMac = m["router-mac"][0]
 	}
-	fmt.Println("pathfilter:", pathfilter)
+
 	return pathfilter, err
 }
 
@@ -789,9 +790,10 @@ func showNeighborRib(r string, name string, args []string) error {
 		showLabel = true
 	}
 
+	var target string
 	var filter []*api.TableLookupPrefix
 	if len(args) > 0 {
-		target := args[0]
+		//target := args[0]
 		switch family {
 		case bgp.RF_EVPN:
 			// Uses target as EVPN Route Type string
@@ -801,9 +803,7 @@ func showNeighborRib(r string, name string, args []string) error {
 			}
 		}
 		var option api.TableLookupOption
-		args = args[1:]
 		// get by filter
-
 		pathfilter, err = getRibShowFilter(args)
 		if err != nil {
 			return fmt.Errorf("show rib by filter failed: %v", err.Error())
@@ -820,17 +820,22 @@ func showNeighborRib(r string, name string, args []string) error {
 				}
 				validationTarget = target
 			}
+
+			switch strings.ToLower(args[0]) {
+			case "a-d", "macadv", "multicast", "esi", "prefix":
+				target = args[0]
+			}
+
 			args = args[1:]
 		}
 
-		filter = []*api.TableLookupPrefix{&api.TableLookupPrefix{
-			Prefix:       target,
-			LookupOption: option,
-		},
+		if len(target) > 0 {
+			filter = []*api.TableLookupPrefix{&api.TableLookupPrefix{
+				Prefix:       target,
+				LookupOption: option,
+			},
+			}
 		}
-
-		fmt.Println("filter Prefix:", target)
-		fmt.Println("filter:", filter)
 	}
 
 	var rib *api.Table
@@ -838,15 +843,15 @@ func showNeighborRib(r string, name string, args []string) error {
 	case CMD_GLOBAL:
 		rib, err = client.GetRIB(family, filter, pathfilter)
 	case CMD_LOCAL:
-		rib, err = client.GetLocalRIB(name, family, filter)
+		rib, err = client.GetLocalRIB(name, family, filter, pathfilter)
 	case CMD_ADJ_IN, CMD_ACCEPTED, CMD_REJECTED:
 		showIdentifier = bgp.BGP_ADD_PATH_RECEIVE
-		rib, err = client.GetAdjRIBIn(name, family, filter)
+		rib, err = client.GetAdjRIBIn(name, family, filter, pathfilter)
 	case CMD_ADJ_OUT:
 		showIdentifier = bgp.BGP_ADD_PATH_SEND
-		rib, err = client.GetAdjRIBOut(name, family, filter)
+		rib, err = client.GetAdjRIBOut(name, family, filter, pathfilter)
 	case CMD_VRF:
-		rib, err = client.GetVRFRIB(name, family, filter)
+		rib, err = client.GetVRFRIB(name, family, filter, pathfilter)
 	}
 
 	if err != nil {

@@ -609,12 +609,9 @@ func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
 		}
 	}
 
-	fmt.Println("guest_mac:", guest_mac.String())
 	if len(pathfilter.Mac) > 0 {
-		fmt.Println("check mac...")
 		match = false
 		for _, mac := range pathfilter.Mac {
-			fmt.Println("mac:", mac)
 			if mac == guest_mac.String() {
 				match = true
 				break
@@ -626,10 +623,8 @@ func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
 	}
 
 	if len(pathfilter.Ip) > 0 {
-		fmt.Println("check ip...")
 		match = false
 		for _, ip := range pathfilter.Ip {
-			fmt.Println("ip:", ip)
 			if ip == guest_ip.String() {
 				match = true
 				break
@@ -641,10 +636,8 @@ func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
 	}
 
 	if len(pathfilter.Rt) > 0 {
-		fmt.Println("check rt...")
 		match = false
 		for _, rt := range pathfilter.Rt {
-			fmt.Println("Rt:", rt)
 			if path_rt == rt {
 				match = true
 				break
@@ -656,7 +649,6 @@ func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
 	}
 
 	if len(pathfilter.Rd) > 0 {
-		fmt.Println("check rd:", pathfilter.Rd)
 		match = false
 		if pathfilter.Rd == rd {
 			match = true
@@ -668,10 +660,8 @@ func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
 
 	if len(pathfilter.AsPath) > 0 {
 		aspath := path.GetAsString()
-		fmt.Println("check AsPath:", pathfilter.AsPath)
-		fmt.Println("path AsPath:", aspath)
 		match = false
-		if pathfilter.AsPath == aspath {
+		if strings.TrimSpace(pathfilter.AsPath) == aspath {
 			match = true
 		}
 		if match == false {
@@ -680,7 +670,6 @@ func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
 	}
 
 	if len(pathfilter.Nexthop) > 0 {
-		fmt.Println("check Nexthop:", pathfilter.Nexthop)
 		match = false
 		if pathfilter.Nexthop == nexthop.String() {
 			match = true
@@ -691,7 +680,6 @@ func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
 	}
 
 	if len(pathfilter.RouterMac) > 0 {
-		fmt.Println("check RouterMac:", pathfilter.RouterMac)
 		match = false
 		if pathfilter.RouterMac == path_router_mac.String() {
 			match = true
@@ -705,8 +693,6 @@ func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
 }
 
 func (s *Server) GetPath(arg *GetPathRequest, stream GobgpApi_GetPathServer) error {
-	fmt.Println("get path...")
-	fmt.Println("pathfilter:", arg.Pathfilter)
 	f := func() []*table.LookupPrefix {
 		l := make([]*table.LookupPrefix, 0, len(arg.Prefixes))
 		for _, p := range arg.Prefixes {
@@ -725,7 +711,6 @@ func (s *Server) GetPath(arg *GetPathRequest, stream GobgpApi_GetPathServer) err
 	var v []*table.Validation
 	switch arg.Type {
 	case Resource_LOCAL, Resource_GLOBAL:
-		fmt.Println("get Resource_LOCAL, Resource_GLOBAL path...")
 		tbl, v, err = s.bgpServer.GetRib(arg.Name, family, f())
 	case Resource_ADJ_IN:
 		in = true

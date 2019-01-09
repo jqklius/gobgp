@@ -243,7 +243,7 @@ func (cli *Client) SoftReset(addr string, family bgp.RouteFamily) error {
 	return cli.softreset(addr, family, api.SoftResetNeighborRequest_BOTH)
 }
 
-func (cli *Client) _getRIB(resource api.Resource, name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
+func (cli *Client) getResRIB(resource api.Resource, name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
 
 	stream, err := cli.cli.GetPath(context.Background(), &api.GetPathRequest{
 		Type:       resource,
@@ -285,36 +285,52 @@ func (cli *Client) _getRIB(resource api.Resource, name string, family bgp.RouteF
 	}, nil
 }
 
-func (cli *Client) getRIBByFilter(resource api.Resource, name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
-	return cli._getRIB(resource, name, family, prefixes, pathfilter)
+func (cli *Client) getFilterRIB(resource api.Resource, name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
+	return cli.getResRIB(resource, name, family, prefixes, pathfilter)
 }
 
 func (cli *Client) getRIB(resource api.Resource, name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
-	return cli._getRIB(resource, name, family, prefixes, nil)
+	return cli.getResRIB(resource, name, family, prefixes, nil)
 }
 
 func (cli *Client) GetRIB(family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
 	if pathfilter != nil {
-		return cli.getRIBByFilter(api.Resource_GLOBAL, "", family, prefixes, pathfilter)
+		return cli.getFilterRIB(api.Resource_GLOBAL, "", family, prefixes, pathfilter)
 	} else {
 		return cli.getRIB(api.Resource_GLOBAL, "", family, prefixes)
 	}
 }
 
-func (cli *Client) GetLocalRIB(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
-	return cli.getRIB(api.Resource_LOCAL, name, family, prefixes)
+func (cli *Client) GetLocalRIB(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
+	if pathfilter != nil {
+		return cli.getFilterRIB(api.Resource_LOCAL, name, family, prefixes, pathfilter)
+	} else {
+		return cli.getRIB(api.Resource_LOCAL, name, family, prefixes)
+	}
 }
 
-func (cli *Client) GetAdjRIBIn(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
-	return cli.getRIB(api.Resource_ADJ_IN, name, family, prefixes)
+func (cli *Client) GetAdjRIBIn(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
+	if pathfilter != nil {
+		return cli.getFilterRIB(api.Resource_ADJ_IN, name, family, prefixes, pathfilter)
+	} else {
+		return cli.getRIB(api.Resource_ADJ_IN, name, family, prefixes)
+	}
 }
 
-func (cli *Client) GetAdjRIBOut(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
-	return cli.getRIB(api.Resource_ADJ_OUT, name, family, prefixes)
+func (cli *Client) GetAdjRIBOut(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
+	if pathfilter != nil {
+		return cli.getFilterRIB(api.Resource_ADJ_OUT, name, family, prefixes, pathfilter)
+	} else {
+		return cli.getRIB(api.Resource_ADJ_OUT, name, family, prefixes)
+	}
 }
 
-func (cli *Client) GetVRFRIB(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix) (*api.Table, error) {
-	return cli.getRIB(api.Resource_VRF, name, family, prefixes)
+func (cli *Client) GetVRFRIB(name string, family bgp.RouteFamily, prefixes []*api.TableLookupPrefix, pathfilter *api.PathFilter) (*api.Table, error) {
+	if pathfilter != nil {
+		return cli.getFilterRIB(api.Resource_VRF, name, family, prefixes, pathfilter)
+	} else {
+		return cli.getRIB(api.Resource_VRF, name, family, prefixes)
+	}
 }
 
 func (cli *Client) getRIBInfo(resource api.Resource, name string, family bgp.RouteFamily) (*api.TableInfo, error) {
