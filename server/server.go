@@ -543,11 +543,18 @@ func (s *BgpServer) filterpath(peer *Peer, path, old *table.Path) *table.Path {
 		options.ValidationResult = v
 	}
 
-	path = peer.policy.ApplyPolicy(peer.ID(), table.POLICY_DIRECTION_EXPORT, path, options)
+	// check global policy first
+	path = peer.policy.ApplyPolicy(table.GLOBAL_RIB_NAME, table.POLICY_DIRECTION_EXPORT, path, options)
+	if path != nil {
+		path = peer.policy.ApplyPolicy(peer.ID(), table.POLICY_DIRECTION_EXPORT, path, options)
+	}
 	// When 'path' is filtered (path == nil), check 'old' has been sent to this peer.
 	// If it has, send withdrawal to the peer.
 	if path == nil && old != nil {
-		o := peer.policy.ApplyPolicy(peer.TableID(), table.POLICY_DIRECTION_EXPORT, old, options)
+		o := peer.policy.ApplyPolicy(table.GLOBAL_RIB_NAME, table.POLICY_DIRECTION_EXPORT, old, options)
+		if o == nil {
+			o = peer.policy.ApplyPolicy(peer.TableID(), table.POLICY_DIRECTION_EXPORT, old, options)
+		}
 		if o != nil {
 			path = old.Clone(true)
 		}
@@ -859,10 +866,8 @@ func (server *BgpServer) propagateUpdate(peer *Peer, pathList []*table.Path) {
 	rs := peer != nil && peer.isRouteServerClient()
 	vrf := !rs && peer != nil && peer.fsm.pConf.Config.Vrf != ""
 
-	tableId := table.GLOBAL_RIB_NAME
 	rib := server.globalRib
 	if rs {
-		tableId = peer.TableID()
 		rib = server.rsRib
 	}
 
@@ -880,7 +885,11 @@ func (server *BgpServer) propagateUpdate(peer *Peer, pathList []*table.Path) {
 			policyOptions.ValidationResult = v
 		}
 
-		if p := server.policy.ApplyPolicy(tableId, table.POLICY_DIRECTION_IMPORT, path, policyOptions); p != nil {
+		p := server.policy.ApplyPolicy(table.GLOBAL_RIB_NAME, table.POLICY_DIRECTION_IMPORT, path, policyOptions)
+		if p != nil && peer != nil {
+			p = server.policy.ApplyPolicy(peer.ID(), table.POLICY_DIRECTION_IMPORT, path, policyOptions)
+		}
+		if p != nil {
 			path = p
 		} else {
 			path = path.Clone(true)
