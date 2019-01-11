@@ -3874,7 +3874,7 @@ func (r *RoutingPolicy) DeletePolicyAssignment(id string, dir PolicyDirection, p
 		if err != nil {
 			return
 		}
-		err = r.setDefaultPolicy(id, dir, ROUTE_TYPE_NONE)
+		err = r.setDefaultPolicy(id, dir, ROUTE_TYPE_ACCEPT)
 	} else {
 		l := len(cur) - len(ps)
 		if l < 0 {

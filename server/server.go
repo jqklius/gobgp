@@ -543,7 +543,7 @@ func (s *BgpServer) filterpath(peer *Peer, path, old *table.Path) *table.Path {
 		options.ValidationResult = v
 	}
 
-	path = peer.policy.ApplyPolicy(peer.TableID(), table.POLICY_DIRECTION_EXPORT, path, options)
+	path = peer.policy.ApplyPolicy(peer.ID(), table.POLICY_DIRECTION_EXPORT, path, options)
 	// When 'path' is filtered (path == nil), check 'old' has been sent to this peer.
 	// If it has, send withdrawal to the peer.
 	if path == nil && old != nil {
@@ -2548,9 +2548,7 @@ func (server *BgpServer) toPolicyInfo(name string, dir table.PolicyDirection) (s
 		if !ok {
 			return "", fmt.Errorf("not found peer %s", name)
 		}
-		if !peer.isRouteServerClient() {
-			return "", fmt.Errorf("non-rs-client peer %s doesn't have per peer policy", name)
-		}
+
 		return peer.ID(), nil
 	}
 }
