@@ -22,7 +22,7 @@ import (
 	"os"
 )
 
-var version = "1.33.10"
+var version = "1.33.12"
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "--version" {
