@@ -797,7 +797,6 @@ func showNeighborRib(r string, name string, args []string) error {
 	var target string
 	var filter []*api.TableLookupPrefix
 	if len(args) > 0 {
-		//target := args[0]
 		switch family {
 		case bgp.RF_EVPN:
 			// Uses target as EVPN Route Type string
@@ -806,30 +805,28 @@ func showNeighborRib(r string, name string, args []string) error {
 				return err
 			}
 		}
-		var option api.TableLookupOption
-		// get by filter
+
+		// Get filter
 		pathfilter, err = getRibShowFilter(args)
 		if err != nil {
 			return fmt.Errorf("show rib by filter failed: %v", err.Error())
 		}
 
+		var option api.TableLookupOption
 		for len(args) != 0 {
-			if args[0] == "longer-prefixes" {
+			switch strings.ToLower(args[0]) {
+			case "a-d", "macadv", "multicast", "esi", "prefix":
+				target = args[0]
+			case "longer-prefixes":
 				option = api.TableLookupOption_LOOKUP_LONGER
-			} else if args[0] == "shorter-prefixes" {
+			case "shorter-prefixes":
 				option = api.TableLookupOption_LOOKUP_SHORTER
-			} else if args[0] == "validation" {
+			case "validation":
 				if r != CMD_ADJ_IN {
 					return fmt.Errorf("RPKI information is supported for only adj-in.")
 				}
 				validationTarget = target
 			}
-
-			switch strings.ToLower(args[0]) {
-			case "a-d", "macadv", "multicast", "esi", "prefix":
-				target = args[0]
-			}
-
 			args = args[1:]
 		}
 

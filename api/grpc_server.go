@@ -578,7 +578,7 @@ func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
 	var guest_mac net.HardwareAddr
 	var guest_ip net.IP
 	var path_router_mac net.HardwareAddr
-	var path_rt string
+	var path_rt_map = make(map[string]string)
 	nexthop := path.GetNexthop()
 
 	route_type := path.GetNlri().(*bgp.EVPNNLRI).RouteType
@@ -602,7 +602,8 @@ func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
 			path_router_mac = ec.(*bgp.RouterMacExtended).Mac
 			break
 		case bgp.EC_SUBTYPE_ROUTE_TARGET:
-			path_rt = ec.String()
+			rt := ec.String()
+			path_rt_map[rt] = rt
 			break
 		default:
 			break
@@ -638,7 +639,7 @@ func isPathFilterMath(path *table.Path, pathfilter *PathFilter) bool {
 	if len(pathfilter.Rt) > 0 {
 		match = false
 		for _, rt := range pathfilter.Rt {
-			if path_rt == rt {
+			if _, ok := path_rt_map[rt]; ok {
 				match = true
 				break
 			}
