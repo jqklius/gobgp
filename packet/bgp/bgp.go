@@ -4931,6 +4931,10 @@ const (
 	BGP_ATTR_TYPE_PEER_DOWN                BGPAttrType = 100
 )
 
+const (
+	BGP_PEER_DONW_ERROR       uint8 = 1
+)
+
 // NOTIFICATION Error Code  RFC 4271 4.5.
 const (
 	_ = iota
