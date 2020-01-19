@@ -948,12 +948,12 @@ func (server *BgpServer) propagateUpdate(peer *Peer, pathList []*table.Path) {
 		}
 
 		if dsts := rib.Update(path); len(dsts) > 0 {
-			server.propagateUpdateToNeighbors(peer, path, dsts, true)
+			server.propagateUpdateToNeighbors(peer, path, dsts, true, false)
 		}
 	}
 }
 
-func (server *BgpServer) dropPeerAllRoutes(peer *Peer, families []bgp.RouteFamily) {
+func (server *BgpServer) dropPeerAllRoutes(peer *Peer, families []bgp.RouteFamily, peerDown bool) {
 	rib := server.globalRib
 	if peer.isRouteServerClient() {
 		rib = server.rsRib
@@ -962,19 +962,19 @@ func (server *BgpServer) dropPeerAllRoutes(peer *Peer, families []bgp.RouteFamil
 		for _, path := range rib.GetPathListByPeer(peer.fsm.peerInfo, family) {
 			p := path.Clone(true)
 			if dsts := rib.Update(p); len(dsts) > 0 {
-				server.propagateUpdateToNeighbors(peer, p, dsts, false)
+				server.propagateUpdateToNeighbors(peer, p, dsts, false, peerDown)
 			}
 		}
 	}
 }
 
-func dstsToPaths(id string, as uint32, dsts []*table.Update) ([]*table.Path, []*table.Path, [][]*table.Path) {
+func dstsToPaths(id string, as uint32, dsts []*table.Update, peerDown bool) ([]*table.Path, []*table.Path, [][]*table.Path) {
 	bestList := make([]*table.Path, 0, len(dsts))
 	oldList := make([]*table.Path, 0, len(dsts))
 	mpathList := make([][]*table.Path, 0, len(dsts))
 
 	for _, dst := range dsts {
-		best, old, mpath := dst.GetChanges(id, as, false)
+		best, old, mpath := dst.GetChanges(id, as, peerDown)
 		bestList = append(bestList, best)
 		oldList = append(oldList, old)
 		if mpath != nil {
@@ -984,14 +984,14 @@ func dstsToPaths(id string, as uint32, dsts []*table.Update) ([]*table.Path, []*
 	return bestList, oldList, mpathList
 }
 
-func (server *BgpServer) propagateUpdateToNeighbors(source *Peer, newPath *table.Path, dsts []*table.Update, needOld bool) {
+func (server *BgpServer) propagateUpdateToNeighbors(source *Peer, newPath *table.Path, dsts []*table.Update, needOld, peerDown bool) {
 	if table.SelectionOptions.DisableBestPathSelection {
 		return
 	}
 	var gBestList, gOldList, bestList, oldList []*table.Path
 	var mpathList [][]*table.Path
 	if source == nil || !source.isRouteServerClient() {
-		gBestList, gOldList, mpathList = dstsToPaths(table.GLOBAL_RIB_NAME, 0, dsts)
+		gBestList, gOldList, mpathList = dstsToPaths(table.GLOBAL_RIB_NAME, 0, dsts, peerDown)
 		server.notifyBestWatcher(gBestList, mpathList)
 	}
 	family := newPath.GetRouteFamily()
@@ -1034,7 +1034,7 @@ func (server *BgpServer) propagateUpdateToNeighbors(source *Peer, newPath *table
 			}
 			oldList = nil
 		} else if targetPeer.isRouteServerClient() {
-			bestList, oldList, _ = dstsToPaths(targetPeer.TableID(), targetPeer.AS(), dsts)
+			bestList, oldList, _ = dstsToPaths(targetPeer.TableID(), targetPeer.AS(), dsts, false)
 		} else {
 			bestList = gBestList
 			oldList = gOldList
@@ -1073,7 +1073,7 @@ func (server *BgpServer) handleFSMMessage(peer *Peer, e *FsmMsg) {
 			}
 			peer.prefixLimitWarned = make(map[bgp.RouteFamily]bool)
 			peer.DropAll(drop)
-			server.dropPeerAllRoutes(peer, drop)
+			server.dropPeerAllRoutes(peer, drop, true)
 			if peer.fsm.pConf.Config.PeerAs == 0 {
 				peer.fsm.pConf.State.PeerAs = 0
 				peer.fsm.peerInfo.AS = 0
@@ -1090,7 +1090,7 @@ func (server *BgpServer) handleFSMMessage(peer *Peer, e *FsmMsg) {
 				llgr, no_llgr := peer.llgrFamilies()
 
 				peer.DropAll(no_llgr)
-				server.dropPeerAllRoutes(peer, no_llgr)
+				server.dropPeerAllRoutes(peer, no_llgr, true)
 
 				// attach LLGR_STALE community to paths in peer's adj-rib-in
 				// paths with NO_LLGR are deleted
@@ -1124,7 +1124,7 @@ func (server *BgpServer) handleFSMMessage(peer *Peer, e *FsmMsg) {
 									"Family": family,
 								}).Debugf("LLGR restart timer (%d sec) for %s expired", t, family)
 								peer.DropAll([]bgp.RouteFamily{family})
-								server.dropPeerAllRoutes(peer, []bgp.RouteFamily{family})
+								server.dropPeerAllRoutes(peer, []bgp.RouteFamily{family}, true)
 
 								// when all llgr restart timer expired, stop PeerRestarting
 								if peer.llgrRestartTimerExpired(family) {
@@ -1148,7 +1148,7 @@ func (server *BgpServer) handleFSMMessage(peer *Peer, e *FsmMsg) {
 				// delete all the stale routes from the peer that it is retaining.
 				peer.fsm.pConf.GracefulRestart.State.PeerRestarting = false
 				peer.DropAll(peer.configuredRFlist())
-				server.dropPeerAllRoutes(peer, peer.configuredRFlist())
+				server.dropPeerAllRoutes(peer, peer.configuredRFlist(), true)
 			}
 		}
 
@@ -2220,7 +2220,7 @@ func (server *BgpServer) deleteNeighbor(c *config.Neighbor, code, subcode uint8)
 
 	go n.stopFSM()
 	delete(server.neighborMap, addr)
-	server.dropPeerAllRoutes(n, n.configuredRFlist())
+	server.dropPeerAllRoutes(n, n.configuredRFlist(), false)
 	return nil
 }
 

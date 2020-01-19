@@ -4928,6 +4928,7 @@ const (
 	BGP_ATTR_TYPE_IP6_EXTENDED_COMMUNITIES             // = 25
 	BGP_ATTR_TYPE_AIGP                                 // = 26
 	BGP_ATTR_TYPE_LARGE_COMMUNITY          BGPAttrType = 32
+	BGP_ATTR_TYPE_PEER_DOWN                BGPAttrType = 100
 )
 
 // NOTIFICATION Error Code  RFC 4271 4.5.
