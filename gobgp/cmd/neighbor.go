@@ -1116,7 +1116,11 @@ func modNeighbor(cmdType string, args []string) error {
 		params["replace-peer-as"] = PARAM_FLAG
 		params["ebgp-multihop-ttl"] = PARAM_SINGLE
 		params["remote-port"] = PARAM_SINGLE
-		usage += " [ family <address-families-list> | vrf <vrf-name> | route-reflector-client [<cluster-id>] | route-server-client | allow-own-as <num> | remove-private-as (all|replace) | replace-peer-as | ebgp-multihop-ttl <ttl> | remote-port <port>]"
+		params["mp-graceful-restart"] = PARAM_FLAG
+		params["graceful-restart"] = PARAM_SINGLE
+		usage += " [ family <address-families-list> | vrf <vrf-name> | route-reflector-client [<cluster-id>] | " +
+			"route-server-client | allow-own-as <num> | remove-private-as (all|replace) | replace-peer-as | " +
+			"ebgp-multihop-ttl <ttl> | remote-port <port> | mp-graceful-restart | graceful-restart <time> ]"
 	}
 
 	m, err := extractReserved(args, params)
@@ -1173,13 +1177,27 @@ func modNeighbor(cmdType string, args []string) error {
 			peer.Config.PeerAs = uint32(as)
 		}
 		if len(m["family"]) == 1 {
+			enableMpGracefulRestart := false
+			if _, ok := m["mp-graceful-restart"]; ok {
+				enableMpGracefulRestart = true
+			}
 			peer.AfiSafis = make([]config.AfiSafi, 0) // for the case of CMD_UPDATE
 			for _, family := range strings.Split(m["family"][0], ",") {
 				afiSafiName := config.AfiSafiType(family)
 				if afiSafiName.ToInt() == -1 {
 					return fmt.Errorf("invalid family value: %s", family)
 				}
-				peer.AfiSafis = append(peer.AfiSafis, config.AfiSafi{Config: config.AfiSafiConfig{AfiSafiName: afiSafiName}})
+				afiSafi := config.AfiSafi{
+					Config: config.AfiSafiConfig{
+						AfiSafiName: afiSafiName,
+					},
+					MpGracefulRestart: config.MpGracefulRestart{
+						Config: config.MpGracefulRestartConfig{
+							Enabled: enableMpGracefulRestart,
+						},
+					},
+				}
+				peer.AfiSafis = append(peer.AfiSafis, afiSafi)
 			}
 		}
 		if len(m["vrf"]) == 1 {
@@ -1236,6 +1254,18 @@ func modNeighbor(cmdType string, args []string) error {
 				return err
 			}
 			peer.Transport.Config.RemotePort = uint16(remotePort)
+		}
+		if len(m["graceful-restart"]) == 1 {
+			restartTime, err := strconv.ParseUint(m["graceful-restart"][0], 10, 16)
+			if err != nil {
+				return err
+			}
+			peer.GracefulRestart = config.GracefulRestart{
+				Config: config.GracefulRestartConfig{
+					Enabled:      true,
+					RestartTime:  uint16(restartTime),
+				},
+			}
 		}
 		return nil
 	}
