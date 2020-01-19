@@ -600,7 +600,7 @@ func (u *Update) GetChanges(id string, as uint32, peerDown bool) (*Path, *Path, 
 				// down so paths are not in knowpath
 				// or adjin.
 				old.setPathAttr(bgp.NewPathAttributeUnknown(
-					bgp.BGP_ATTR_FLAG_OPTIONAL, bgp.BGP_ATTR_TYPE_PEER_DOWN, []byte{bgp.BGP_PEER_DONW_ERROR}))
+					bgp.BGP_ATTR_FLAG_OPTIONAL, bgp.BGP_ATTR_TYPE_PEER_DOWN, []byte{bgp.BGP_PEER_DOWN_ERROR}))
 				old.IsWithdraw = true
 				return old, old
 			}

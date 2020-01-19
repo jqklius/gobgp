@@ -4932,7 +4932,7 @@ const (
 )
 
 const (
-	BGP_PEER_DONW_ERROR       uint8 = 1
+	BGP_PEER_DOWN_ERROR       uint8 = 1
 )
 
 // NOTIFICATION Error Code  RFC 4271 4.5.
