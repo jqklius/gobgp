@@ -4932,7 +4932,7 @@ const (
 )
 
 const (
-	BGP_PEER_DOWN_ERROR       uint8 = 1
+	BGP_PEER_DOWN_ERROR uint8 = 1
 )
 
 // NOTIFICATION Error Code  RFC 4271 4.5.
@@ -8927,7 +8927,7 @@ func (p *PathAttributeUnknown) Serialize(options ...*MarshallingOption) ([]byte,
 }
 
 func (p *PathAttributeUnknown) String() string {
-	return fmt.Sprintf("{Flags: %s, Type: %s, Value: %s}", p.Flags, p.Type, p.Value)
+	return fmt.Sprintf("{Flags: %v, Type: %v, Value: %v}", p.Flags, p.Type, p.Value)
 }
 
 func (p *PathAttributeUnknown) MarshalJSON() ([]byte, error) {

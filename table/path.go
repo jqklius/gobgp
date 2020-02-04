@@ -1177,3 +1177,14 @@ func (p *Path) SetHash(v uint32) {
 func (p *Path) GetHash() uint32 {
 	return p.attrsHash
 }
+
+func (p *Path) GetPeerDown() bool {
+	if attr := p.getPathAttr(bgp.BGP_ATTR_TYPE_PEER_DOWN); attr != nil {
+		if peerDown, ok := attr.(*bgp.PathAttributeUnknown); ok {
+			if len(peerDown.Value) == 1 && peerDown.Value[0] == bgp.BGP_PEER_DOWN_ERROR {
+				return true
+			}
+		}
+	}
+	return false
+}
