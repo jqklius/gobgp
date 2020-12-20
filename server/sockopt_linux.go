@@ -22,6 +22,8 @@ import (
 	"os"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -241,23 +243,23 @@ func (d *TCPDialer) DialTCP(addr string, port int) (*net.TCPConn, error) {
 		return nil, os.NewSyscallError("connect", err)
 	}
 
-	epfd, e := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
+	epfd, e := unix.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	if e != nil {
 		return nil, e
 	}
 	defer syscall.Close(epfd)
 
-	var event syscall.EpollEvent
-	events := make([]syscall.EpollEvent, 1)
+	var event unix.EpollEvent
+	events := make([]unix.EpollEvent, 1)
 
-	event.Events = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLPRI
+	event.Events = unix.EPOLLIN | unix.EPOLLOUT | unix.EPOLLPRI
 	event.Fd = int32(fd)
-	if e = syscall.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event); e != nil {
+	if e = unix.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event); e != nil {
 		return nil, e
 	}
 
 	for {
-		nevents, e := syscall.EpollWait(epfd, events, int(d.Timeout/1000000) /*msec*/)
+		nevents, e := unix.EpollWait(epfd, events, int(d.Timeout/1000000) /*msec*/)
 		if e != nil {
 			return nil, e
 		}
